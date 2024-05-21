@@ -11,13 +11,13 @@
 // @grant        none
 // ==/UserScript==
 /* globals jQuery, $, waitForKeyElements */
+var buttonSize = 20;
 
 function CreateTextFile(list) {
-    var fileName = $('.page-title-container').find('div').find('h1').length ?
-        fileName = $('.page-title-container').find('div').find('h1').text() + '.txt' :
-        'CardmarketList.txt'
-    var textToWrite = list
-    var textFileAsBlob = new Blob([textToWrite], {
+    var fileName = $('.page-title-container').find('div').find('h1').length 
+        ? fileName = $('.page-title-container').find('div').find('h1').text() + '.txt' 
+        :'CardmarketList.txt';
+    var textFileAsBlob = new Blob([list], {
         type: 'text/plain'
     });
     var downloadLink = document.createElement('a');
@@ -42,16 +42,19 @@ function CopyToClipboard(list, tableInterface) {
 
 function GetCardListClueless(row, output) {
     var data = $(row).find('td');
-    !output[data.eq(2).text()] ?
-        output[data.eq(2).text()] += parseInt(data.eq(1).text()) :
-        output[data.eq(2).text()] = parseInt(data.eq(1).text());
+    var cardName = data.eq(2).text();
+    var quantity = parseInt(data.eq(1).text());
+    output[cardName]
+        ? output[cardName] += quantity
+        : output[cardName] = quantity;
 }
 
 function GetCardListByClassNames(row, output) {
-    var amount = parseInt($(row).find('.amount').text().replace('x', ''));
-    output[$(row).find('.name').find('a').text()] ?
-        output[$(row).find('.name').find('a').text()] += amount :
-        output[$(row).find('.name').find('a').text()] = amount;
+    var cardName = $(row).find('.name').find('a').text();
+    var quantity = parseInt($(row).find('.amount').text().replace('x', ''));
+    output[cardName] 
+        ? output[cardName] += quantity 
+        : output[cardName] = quantity;
 }
 
 function ExportList(table) {
@@ -60,12 +63,9 @@ function ExportList(table) {
     var list = {};
 
     rows.each(function() {
-        if (!$(this).find('.amount').length) {
-            GetCardListClueless(this, list);
-        }
-        else {
-            GetCardListByClassNames(this, list);
-        }
+        $(this).find('.amount').length
+            ? GetCardListByClassNames(this, list)
+            : GetCardListClueless(this, list);
     });
     $.each(list, function(key, value) {
         cardNames += value + ' ' + key + '\n';
@@ -101,31 +101,40 @@ function CreateTableInterface(table) {
 function PrepareButtonsBeforeTable(table) {
     var tableInterface = CreateTableInterface(table);
 
-    table.prepend(tableInterface.message);
-    table.prepend(tableInterface.clipboard);
-    table.prepend(' ');
-    table.prepend(tableInterface.export);
+    table.before(tableInterface.message);
+    table.before(tableInterface.clipboard);
+    table.before(' ');
+    table.before(tableInterface.export);
 }
 
 function PrepareButtonsAfterTable(table) {
     var tableInterface = CreateTableInterface(table);
 
-    table.append(tableInterface.export);
-    table.prepend(' ');
-    table.append(tableInterface.clipboard);
-    table.append(tableInterface.message);
+    table.after(tableInterface.message);
+    table.after(tableInterface.export);
+    table.after(' ');
+    table.after(tableInterface.clipboard);
+}
+
+function ResizeElement(element, adjustment){
+    return parseFloat(element.replace("px", "")) + adjustment + "px"
+}
+
+function AdjustCardPlacement(card, adjustment) {
+    card.style.top = ResizeElement(card.style.top, adjustment);
 }
 
 $(document).ready(function() {
     SetupWantsTableExports();
     SetupShoppingCartExports();
-    SetupTransactionResultsExports();
+    SetupShoppingWizardExports();
 });
 
 function SetupWantsTableExports() {
     if (!$('#WantsListTable').length) {
         return;
     }
+
     PrepareButtonsBeforeTable($('#WantsListTable'));
 }
 
@@ -133,18 +142,34 @@ function SetupShoppingCartExports() {
     if (!$('.category-subsection').length) {
         return;
     }
+
     var tables = $('.category-subsection');
     tables.each(function() {
         PrepareButtonsBeforeTable($(this));
     });
 }
 
-function SetupTransactionResultsExports() {
+function SetupShoppingWizardExports() {
     if (!$('#ShoppingWizardResult').length) {
         return;
     }
+
     var tables = $('.card');
+    var leftIndex = 0;
+    var rightIndex = 0;
+
     tables.each(function() {
         PrepareButtonsAfterTable($(this));
+        if(this.parentNode.style.left == "0%") {
+            AdjustCardPlacement(this.parentNode, buttonSize * leftIndex);
+            leftIndex += 1;
+        }
+        else {
+            AdjustCardPlacement(this.parentNode, buttonSize * rightIndex);
+            rightIndex += 1;
+        }
     });
+
+    var section = tables[0].parentNode.parentNode;
+    section.style.height = ResizeElement(section.style.height, buttonSize * Math.max(leftIndex, rightIndex));
 }
